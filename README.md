@@ -5,9 +5,27 @@ OneCX integration test toolkit for starting a local platform stack (via Testcont
 ## What this project provides
 
 - A programmatic API (`PlatformManager`) to orchestrate platform containers.
-- A CLI runner (`it-runner`) for end-to-end integration test execution.
+- A CLI runner (published as the `onecx-it-runner` entry) for end-to-end integration test execution.
 - Config-driven startup with default lookup at `integration-tests/platform/platform.json`.
 - Run artifacts with summaries, logs, reports, and E2E outputs.
+
+## Installation
+
+The package is **self-contained**: install it as a single dependency and you get the complete runtime closure. You do **not** declare `testcontainers`, `dockerode`, or `axios` yourself — they are normal dependencies of this package, not peer dependencies.
+
+From the npm registry (the canonical install):
+
+```sh
+npm install @onecx/integration-tests
+```
+
+From a packed tarball (the built package, as produced by the release build):
+
+```sh
+npm install ./onecx-integration-tests-<version>.tgz
+```
+
+The installed package provides the `onecx-it-runner` CLI entry, which resolves inside the built package layout.
 
 ## Public API
 
@@ -59,12 +77,27 @@ npm run it:run -- --help
 - **Platform-only mode**: If no E2E container is configured, the runner starts and validates the platform, collects artifacts, then shuts down.
 - **Dry-run mode** (`--dry-run`): Validates and resolves configuration, determines run mode, creates run artifact directories, and exits without starting containers.
 
-## CLI options (`it-runner`)
+## Running the runner
+
+The runner is invoked the same way in this repository and by a consumer; the only difference is how the entry resolves.
+
+- **In this repository** the entry is wrapped as `npm run it:run` (runs the TypeScript source directly).
+- **As a consumer** the published CLI entry is `onecx-it-runner` (the `bin` entry of the installed package). Run it directly or via `npx` after `npm install @onecx/integration-tests`:
+
+```sh
+onecx-it-runner [options]
+# or
+npx onecx-it-runner [options]
+```
+
+The entry is a working, self-resolving `bin` (it resolves inside the installed package layout; you do not reach into `node_modules` by hand).
+
+### CLI options
 
 | Option           | Description                           | Default |
 | ---------------- | ------------------------------------- | ------- |
 | `-v, --verbose`  | Enable verbose output                 | `false` |
-| `--capture-logs` | Capture runner console output to file | `false` |
+| `--capture-logs` | Capture runner console output to file | `true` |
 | `--dry-run`      | Print execution plan without running  | `false` |
 | `-h, --help`     | Show help                             | `false` |
 
@@ -81,6 +114,33 @@ npm run it:run -- --help
 - If no explicit config path is provided, the validator first checks the default path and then searches recursively from the current working directory for files matching `*platform.json`.
 - The config is validated against the project schema before execution.
 - If no valid config is found, the runner exits with status `failure`.
+
+## Consumer dry-run check
+
+The dry-run mode is the consumer-facing verification step: it resolves and validates the configuration, determines the run mode, creates the run artifact directories, and exits **without starting any containers**. It also proves the CLI entry resolves and the dependency closure is complete after a single install.
+
+**Precondition:** configuration must resolve before the dry-run branch is reached. If no valid `platform.json` is found, the runner exits with status `failure` (see [Configuration](#configuration)) — it never reaches the dry-run step. So run the check from a working directory where a valid configuration resolves (the caller's own platform config, or this repository).
+
+As a consumer (from the caller repository root, so the caller's `platform.json` resolves):
+
+```sh
+onecx-it-runner --dry-run
+```
+
+In this repository (the `npm run it:run` wrapper):
+
+```sh
+npm run it:run -- --dry-run
+```
+
+To exercise the full contract end to end from a packed tarball, install the built package into a scratch project as its only dependency (no separate `testcontainers`, `dockerode`, or `axios` declarations), place a valid `platform.json` where the [config lookup](#configuration) resolves it, and run the dry-run entry:
+
+```sh
+npm install ./onecx-integration-tests-<version>.tgz
+onecx-it-runner --dry-run
+```
+
+If the dry run exits with status `success`, the single-install contract holds: one installation, no peer declarations, a resolvable CLI entry, and a passing configuration check.
 
 ## Artifacts
 
