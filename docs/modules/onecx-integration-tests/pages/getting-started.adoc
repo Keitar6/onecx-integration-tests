@@ -28,13 +28,22 @@ Choose your path based on your role:
 
 == First Run Checklist
 
-Complete these steps in order:
+Complete these steps in order. In this repository the runner is wrapped as `npm run it:run`; a consumer of the published package runs the same flags through the `onecx-it-runner` CLI entry after a single install of `@onecx/integration-tests` (no separate `testcontainers`, `dockerode`, or `axios` declarations).
+
+In this repository:
 
 * Install Node.js, npm, and Docker
 * Run `npm install`
 * Prepare `integration-tests/platform/platform.json`
 * Run `npm run it:run -- --dry-run`
 * Run `npm run it:run -- --verbose --capture-logs`
+* Inspect `integration-tests/artifacts/<run-id>/summary.json`
+
+As a consumer (after `npm install @onecx/integration-tests`):
+
+* Prepare the caller `platform.json` (see xref:ui-repository.adoc[UI Repository Integration])
+* Run the dry run through the published entry: `onecx-it-runner --dry-run`
+* Run the full run: `onecx-it-runner --verbose --capture-logs`
 * Inspect `integration-tests/artifacts/<run-id>/summary.json`
 
 == E2E

@@ -13,6 +13,28 @@ UI repositories consume this integration-test runner through a shared contract.
 The caller repository owns test intent and test assets.
 This runner owns platform bootstrap, health validation, and artifact handling.
 
+== Install the runner
+
+Install the runner as a single dependency in the caller repository. The package is self-contained: a single install of `@onecx/integration-tests` brings its full runtime closure. The caller declares no `testcontainers`, `dockerode`, or `axios` package of its own — those are normal dependencies of this package, not peer dependencies.
+
+From the npm registry:
+
+[source,bash]
+----
+npm install @onecx/integration-tests
+----
+
+From the built package tarball (the release artifact, packed from `dist/`):
+
+[source,bash]
+----
+npm install ./onecx-integration-tests-<version>.tgz
+----
+
+Use the release-built tarball, not a tarball packed from the repository root: only the built layout resolves the `onecx-it-runner` `bin` entry.
+
+After installation, the runner is available as the published CLI entry `onecx-it-runner`. It resolves inside the installed package layout, so the caller invokes it directly (or via `npx onecx-it-runner`) and never reaches into `node_modules` by hand.
+
 == Integration Directory
 
 Create and maintain this structure inside the UI repository:
@@ -61,6 +83,15 @@ Recommended minimum structure:
 
 For field-level details, see xref:contract.adoc[Contract and Configuration].
 
+=== Platform configuration lookup
+
+The runner locates the configuration with this order:
+
+* Default path: `integration-tests/platform/platform.json`
+* If the default path does not exist, a recursive search from the current working directory for files matching `*platform.json`
+
+A caller config at `integration/platform.json` matches the recursive `*platform.json` search, so the runner resolves it without an explicit path argument. Run the runner from the caller repository root so the search covers `integration/platform.json`. The resolved file must contain the top-level `platformConfig` key and validate against the integration schema before any container starts.
+
 == E2E Directory
 
 Store all E2E assets under `integration/e2e/`.
@@ -82,12 +113,36 @@ Implementation guidance:
 * Keep tests deterministic and environment-agnostic
 * Do not embed secrets directly in test sources
 
+== Consumer dry-run check
+
+The dry-run mode is the consumer-side verification step. It resolves and validates `integration/platform.json`, determines the run mode, and creates the run artifact directories without starting any containers. Run it right after installing the runner to prove the entry resolves and the dependency closure is complete.
+
+Run the dry run through the published CLI entry:
+
+[source,bash]
+----
+onecx-it-runner --dry-run
+----
+
+or via `npx`:
+
+[source,bash]
+----
+npx onecx-it-runner --dry-run
+----
+
+A successful dry run exits with status `success`. It validates the configuration and the installed package entry; it does not start Docker containers.
+
+Configuration must resolve before the dry-run branch is reached. If no valid `platform.json` is found, the runner exits with status `failure` and never reaches the dry-run step. For a caller, this is satisfied by running the check from the caller repository root so that `integration/platform.json` resolves (see the Platform configuration lookup subsection above).
+
 == Integration Checklist
 
 Verify these items before opening a pull request:
 
+* The runner is installed as a single dependency (`@onecx/integration-tests`); the caller declares no `testcontainers`, `dockerode`, or `axios`
 * `integration/platform.json` exists and validates
 * `integration/e2e/` contains runnable tests
 * E2E image is available for CI runners
-* Run succeeds with `npm run it:run -- --verbose --capture-logs`
+* The dry run passes: `onecx-it-runner --dry-run` exits with status `success`
+* Run succeeds with `onecx-it-runner --verbose --capture-logs`
 * Artifacts include `summary.json` and `e2e-results/`

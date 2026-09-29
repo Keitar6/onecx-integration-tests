@@ -26,12 +26,27 @@ See xref:contract.adoc[Contract and Configuration] for full field details.
 
 == CLI Options
 
+The runner is invoked the same way in this repository and by a consumer; the only difference is how the entry resolves.
+
+In this repository the entry is wrapped as `npm run it:run`. A consumer uses the published CLI entry `onecx-it-runner` (the `bin` of the installed package), which resolves inside the installed layout without manual `node_modules` paths.
+
 Runner entry command:
+
+In this repository:
 
 [source,bash]
 ----
 npm run it:run -- [options]
 ----
+
+As a consumer:
+
+[source,bash]
+----
+onecx-it-runner [options]
+----
+
+The entry is a working, self-resolving `bin`: a single install of `@onecx/integration-tests` is sufficient, and consumers declare no `testcontainers`, `dockerode`, or `axios` package.
 
 [.stripes-even,cols="25,20,55"]
 |===
@@ -42,7 +57,7 @@ npm run it:run -- [options]
 | Enable verbose output
 
 | `--capture-logs`
-| `false`
+| `true`
 | Capture runner console output and container streams to artifact logs
 
 | `--dry-run`
@@ -56,10 +71,41 @@ npm run it:run -- [options]
 
 Example:
 
+In this repository:
+
 [source,bash]
 ----
 npm run it:run -- --verbose --capture-logs
 ----
+
+As a consumer:
+
+[source,bash]
+----
+onecx-it-runner --verbose --capture-logs
+----
+
+== Consumer dry-run check
+
+The dry-run flag is the consumer-side verification step: it resolves and validates `platform.json`, determines the run mode, and exits without starting containers. A successful dry run exits with status `success`.
+
+Configuration must resolve before the dry-run branch is reached. If no valid `platform.json` is found, the runner exits with status `failure` and never reaches the dry-run step — so run the check from a working directory where a valid configuration resolves (the caller repository root, or this repository).
+
+In this repository:
+
+[source,bash]
+----
+npm run it:run -- --dry-run
+----
+
+As a consumer:
+
+[source,bash]
+----
+onecx-it-runner --dry-run
+----
+
+Run the dry run immediately after installing the runner to confirm the entry resolves and the dependency closure is complete before starting any real run.
 
 == Environment Variables
 
