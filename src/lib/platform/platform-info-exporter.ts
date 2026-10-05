@@ -11,7 +11,9 @@ import {
   getInternalPort,
   isPortAwareContainer,
   isE2eContainer,
+  isTlsCapableContainer,
   getPlatformInfoExportDecision,
+  TLS_PORT,
 } from '../utils/container-utils'
 
 const logger = new Logger('PlatformInfoExporter')
@@ -157,8 +159,15 @@ export class PlatformInfoExporter {
     // Get internal port from container
     const internalPort = getInternalPort(container)
 
+    // Keycloak and UI containers terminate TLS on TLS_PORT; reflect that in the exported URLs
+    // so consumers following this metadata load the shell as a secure origin (required for
+    // keycloak-js's PKCE S256 / Web Crypto API).
+    const isTlsCapable = isTlsCapableContainer(container)
+    const protocol = isTlsCapable ? 'https' : 'http'
+    const connectPort = isTlsCapable ? TLS_PORT : internalPort
+
     try {
-      const mappedPort = container.getMappedPort(internalPort)
+      const mappedPort = container.getMappedPort(connectPort)
       const host = container.getHost()
 
       return {
@@ -167,8 +176,8 @@ export class PlatformInfoExporter {
         host: host,
         port: mappedPort,
         internalPort,
-        internalUrl: `http://${containerName}:${internalPort}`,
-        externalUrl: `http://${host}:${mappedPort}`,
+        internalUrl: `${protocol}://${containerName}:${connectPort}`,
+        externalUrl: `${protocol}://${host}:${mappedPort}`,
         running: true,
       }
     } catch {
@@ -178,7 +187,7 @@ export class PlatformInfoExporter {
         host: '',
         port: 0,
         internalPort,
-        internalUrl: `http://${containerName}:${internalPort}`,
+        internalUrl: `${protocol}://${containerName}:${connectPort}`,
         externalUrl: '',
         running: false,
       }

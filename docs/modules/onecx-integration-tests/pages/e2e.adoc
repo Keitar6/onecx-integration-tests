@@ -24,6 +24,7 @@ Before running E2E:
 * Provide a valid `platform.json`
 * Configure at least one entry in `platformConfig.container.e2e` with `image` and `networkAlias`
 * Ensure the E2E image can access Shell UI and Keycloak over the Docker network
+* Set `ignoreHTTPSErrors: true` in the Playwright config used by the E2E image (see xref:e2e.adoc#_tls_and_self_signed_certificates[TLS and Self-Signed Certificates])
 
 Minimal E2E configuration:
 
@@ -58,6 +59,21 @@ Use dry-run to validate setup without starting containers:
 ----
 npm run it:run -- --dry-run
 ----
+
+== TLS and Self-Signed Certificates
+
+Shell, Keycloak, and every UI/MFE container serve HTTPS on `8443` using a self-signed, test-only certificate so the shell runs as a secure browser context (required for `keycloak-js` PKCE login). The same certificate is reused across all UI container hostnames, so its CN/SAN will not match most of them.
+
+The caller-owned Playwright config in `integration/e2e/playwright.config.ts` must set:
+
+[source,typescript]
+----
+use: {
+  ignoreHTTPSErrors: true,
+}
+----
+
+Trusting the CA instead of setting this flag does not work: because the certificate is shared across hostnames, Chromium's hostname verification still fails for every container other than the one the certificate's CN happens to match.
 
 == Platform Metadata for E2E
 

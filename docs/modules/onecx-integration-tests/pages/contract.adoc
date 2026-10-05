@@ -192,7 +192,7 @@ Example:
 				{
 					"image": "ghcr.io/onecx/onecx-shell-e2e:latest",
 					"networkAlias": "shell-e2e",
-					"baseUrl": "http://onecx-shell-ui:8080"
+					"baseUrl": "https://onecx-shell-ui:8443"
 				}
 			]
 		}
@@ -203,4 +203,9 @@ Example:
 [IMPORTANT]
 ====
 The E2E container runs as a one-shot test workload and is expected to terminate with an explicit exit code
+====
+
+[IMPORTANT]
+====
+Shell, Keycloak, and every MFE/UI container terminate TLS on `8443` using a self-signed, test-only certificate (the same certificate is reused across all UI container hostnames, so its CN/SAN will not match most of them). The caller's own Playwright config must set `use: { ignoreHTTPSErrors: true }` or the browser rejects the chain before login. Trusting the CA instead is not sufficient due to the hostname mismatch.
 ====
