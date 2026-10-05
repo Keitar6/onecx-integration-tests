@@ -7,60 +7,11 @@ import { HealthCheckableContainer } from '../../models/interfaces/health-checkab
 import { HealthCheckExecutor } from '../../models/interfaces/health-check-executor.interface'
 import { HttpHealthCheckExecutor, SkipHealthCheckExecutor } from '../../utils/health-check-executor'
 import { PlatformConfig } from 'src/lib/models'
+import { issueCertificateFor } from '../../utils/tls-ca'
 
 // Native Keycloak HTTPS on 8443 alongside the existing 8080 http listener, so browser auth calls
-// from keycloak-js are not blocked as mixed content by the https shell-ui origin. Self-signed, test-only.
-const KEYCLOAK_TLS_CERT = `-----BEGIN CERTIFICATE-----
-MIIDMzCCAhugAwIBAgIUSzy3wSzd8lVOvQiXk3ptAI4qQXMwDQYJKoZIhvcNAQEL
-BQAwFzEVMBMGA1UEAwwMa2V5Y2xvYWstYXBwMB4XDTI2MTAwMTEyMjUxNVoXDTM2
-MDkyODEyMjUxNVowFzEVMBMGA1UEAwwMa2V5Y2xvYWstYXBwMIIBIjANBgkqhkiG
-9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6CLKA64jRF4MCWc8i4emb1ILxdWePvHEiT+d
-j4IP7Ub115KMxNwlMXCOLvMEloHr0sPKVe7QeFiQmqjxI2GiDsgPGE3IWPSZPxBF
-9ttBd2ckTvF4kFKA8NvM0d/1y4n8iQ3BH7raf1SmoyOVHeS0Y24PMAwtLESEwBUT
-3gHKhWD/T0HKbTHhB2eQfj8+pLi57QruNw4vOEwmzD9DmXMQB2Qse+QgsQLy5wex
-uKTL0lqLnSc9bXpFYFKg5/wv/bVg+NRbrH2U1HzSamx1l9d9yFfk1lweB3hKRg6v
-nuy8JWCfMxFAQ4KzC5mGrLLYezcStMhKSM1dzOnoacm9epQTxwIDAQABo3cwdTAd
-BgNVHQ4EFgQUmrKzs30vz1+tPYzujg+u+ouwUXcwHwYDVR0jBBgwFoAUmrKzs30v
-z1+tPYzujg+u+ouwUXcwDwYDVR0TAQH/BAUwAwEB/zAiBgNVHREEGzAZggxrZXlj
-bG9hay1hcHCCCWxvY2FsaG9zdDANBgkqhkiG9w0BAQsFAAOCAQEAs00FQhEwCFcq
-ccMhtp1IKuXoHqR/cFnkrw+80hRIXxBWeYs/Z0vaptpUeiYo6TxummoADL7hQ0Ri
-TkXPN0tCJHpa1UaovwWKL8pddIglCUltPEQZ3aZTk7jqaVQ4JBzF8P6yDIIBkb7t
-8k7iHVU1b7wG+EHkRaZIE0JsgLvd3o4Mcnq98x9gA9N2VaPjFnX5IIJoHaBxbit/
-jtHflIgZ1/vAwNe/8LckiBT//PTwBIeR+jP1ylEACXSLcfW9z75XBGc+cm9DZZ39
-pKClHdPO5YQMncQLNhBFxhzoyg8h3tLaBJ7oE3J2ApiVWH8biUsuNHmenuD8ZjNP
-rIW2krWJqA==
------END CERTIFICATE-----
-`
-
-const KEYCLOAK_TLS_KEY = `-----BEGIN PRIVATE KEY-----
-MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDoIsoDriNEXgwJ
-ZzyLh6ZvUgvF1Z4+8cSJP52Pgg/tRvXXkozE3CUxcI4u8wSWgevSw8pV7tB4WJCa
-qPEjYaIOyA8YTchY9Jk/EEX220F3ZyRO8XiQUoDw28zR3/XLifyJDcEfutp/VKaj
-I5Ud5LRjbg8wDC0sRITAFRPeAcqFYP9PQcptMeEHZ5B+Pz6kuLntCu43Di84TCbM
-P0OZcxAHZCx75CCxAvLnB7G4pMvSWoudJz1tekVgUqDn/C/9tWD41FusfZTUfNJq
-bHWX133IV+TWXB4HeEpGDq+e7LwlYJ8zEUBDgrMLmYassth7NxK0yEpIzV3M6ehp
-yb16lBPHAgMBAAECggEAJ2Qn5aH6KBLRdhMHqiG1s3Q3vTV3qfS6xhN+eCi47Sm6
-c/9RVeKJiS8xYXQpliSr0NMalaR1ycY1m5kJeliJ+HooXZZtZfLzwkjPpokkPc/J
-0H+XVt45NSYHRqH7grOCn/suh2TcyPijYlGabz0tAyZc+2lFjRp/cFzjRywEosc1
-Jk3yaBMCyub+6JtkAeY5URhdMNu17QBFeRDIDA10SxsDsANCEKmMVDfGl2sTNe/h
-yMCHKalY6wJ1EVRLR0QD4b6rehsuf/syAce8BjzHa6CJAd2fRC41qfky8gxYOtLS
-la45H9AcHyxFy+3omk1YugSjSGZnkqf9pSOv44MMoQKBgQD7NFHdI6FMG7HdfmpP
-tnw6t9BLdVx+uGiXmHdP+YsFQrn7/QYaxE9lPpjQmsYKzHIbWS8qX24sKlHQUw5y
-yx0QIwqbbledq49tQM3DT4kv9oIpyU7THUnEJRXFds+DKOalez6QjNvfDWPbOHih
-HPH7toQynfbtH0rh5OH9ZNqO8QKBgQDskUc/HwnCbqwyTm+/mIeDNLre8pEZSoCK
-ovuDRSzLGzvuRI9i/oznXtB2pZ+2S7N0O7iK490gFefEjCZgRyrsc9myyBDpY/TU
-q27SAQTbScpj9X0MoOZQuCUFnQAkfrg73VOCEKEqs3TKOfjIVxyquVw1wMJp7p2F
-su/IkxE+NwKBgBnzE6nWbmkgS0VoM688WKTwLBI/c2ibwCI428plKtlGRVQklSba
-tKDu0HZsJp0i9X6hvd+QsB7b2Eu+6LUvCjeKhyP7SA2/lTdiBF9yredIfbW3V+8z
-DVW3xwH4/gK8jOb3TkU8Z9Io3fHdaYirJswr1IguDT39h4zCSh4U9wbhAoGAYZdd
-KPEI+ajmaKpq90NZRAtQvACdUy2k8Yxi7bhvzioiAx1Nea1BO4Glxgx1YqLAGUc5
-zjJKWp4uyqp2emlhj8ILIPHf6ChQLBu8z+2Tr1M1px7yw27tFIei3jnygRu1rRyV
-AqcRlagKmhJoS12EefmVzKcEjObfHPTAbqIdDukCgYBtk73qhDy+/rpeK3NHElpR
-d5yEccO2oYlIpqjCZOBv83Zh/dk8JQvmGzRkkdvlguxjG1aFi8IOiu8W1TqT7gM5
-a7j9Xw69ArG285cji2TdQpUcbWpOoq8pfhM/WEoTuYwnJgsA0/jLLuKG3yQSR1qc
-sFdBh7up6jXYzu+4dZ1dKg==
------END PRIVATE KEY-----
-`
+// from keycloak-js are not blocked as mixed content by the https shell-ui origin. Certificate is
+// issued per-alias at start() time (see tls-ca.ts) off the same shared CA as UI containers.
 
 interface OnecxEnvironment {
   realm: string
@@ -275,9 +226,12 @@ export class OnecxKeycloakContainer extends GenericContainer {
       KC_HTTPS_PORT: '8443',
     })
 
+    // Cert SAN must match this container's own hostname, so consumers trusting the exported CA
+    // get real hostname verification, not just a bypass.
+    const { cert, key } = await issueCertificateFor([this.onecxEnvironment.keycloakHostname, 'localhost'])
     this.withCopyContentToContainer([
-      { content: KEYCLOAK_TLS_CERT, target: '/opt/keycloak/conf/tls.crt', mode: 0o644 },
-      { content: KEYCLOAK_TLS_KEY, target: '/opt/keycloak/conf/tls.key', mode: 0o644 },
+      { content: cert, target: '/opt/keycloak/conf/tls.crt', mode: 0o644 },
+      { content: key, target: '/opt/keycloak/conf/tls.key', mode: 0o644 },
     ])
 
     if (this.logFilePath) {

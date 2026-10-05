@@ -15,6 +15,7 @@ import {
   getPlatformInfoExportDecision,
   TLS_PORT,
 } from '../utils/container-utils'
+import { getCaCertificatePem } from '../utils/tls-ca'
 
 const logger = new Logger('PlatformInfoExporter')
 
@@ -147,12 +148,29 @@ export class PlatformInfoExporter {
   }
 
   /**
+   * Write the shared ephemeral CA certificate (that signs every container's TLS leaf cert) to the
+   * e2e artifacts dir, so consumers can trust it instead of disabling certificate validation.
+   */
+  async writeCaCertificateFile(filePath?: string): Promise<void> {
+    const outputPath = filePath ?? path.join(this.outputDir, 'ca.pem')
+
+    const dir = path.dirname(outputPath)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+
+    fs.writeFileSync(outputPath, await getCaCertificatePem())
+    logger.info(`CA certificate written to: ${outputPath}`)
+  }
+
+  /**
    * Export all (log + file)
    */
 
   async exportAll(filePath?: string): Promise<void> {
     await this.logPlatformInfo()
     await this.writePlatformInfoFile(filePath)
+    await this.writeCaCertificateFile()
   }
 
   private async buildContainerInfo(containerName: string, container: PortAwareContainer): Promise<ContainerInfo> {
